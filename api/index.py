@@ -1,4 +1,7 @@
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import requests
 import base64
 import json
@@ -13,7 +16,8 @@ from flask_cors import CORS
 import csv
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS to allow cross-origin requests
+CORS(app, resources={r"/api/*": {"origins": ["https://q.idefi.ai", "https://api.idefi.ai"]}})
+
 
 # Etherscan API Key (ensure to set this as an environment variable)
 ETHERSCAN_API_KEY = os.getenv("NEXT_PUBLIC_ETHERSCAN_API_KEY")
@@ -315,4 +319,4 @@ def get_agent_tracking():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5328)
+    app.run(debug=True, host='0.0.0.0', port=5328)

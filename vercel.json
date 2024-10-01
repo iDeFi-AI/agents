@@ -1,10 +1,15 @@
 {
-    "version": 2,
-    "functions": {
-      "api/**": {
-        "maxDuration": 300,
-        "excludeFiles": "{.next,*.cache,node_modules,public,app}/**"
-      }
+  "version": 2,
+  "functions": {
+    "api/**": {
+      "maxDuration": 300,
+      "excludeFiles": "{.next,*.cache,node_modules,public,app}/**"
     }
-  }
-  
+  },
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "https://agents-idefi-ai-774576244405.us-west1.run.app"
+    }
+  ]
+}
