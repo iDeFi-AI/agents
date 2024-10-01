@@ -1,0 +1,10 @@
+{
+    "version": 2,
+    "functions": {
+      "api/**": {
+        "maxDuration": 300,
+        "excludeFiles": "{.next,*.cache,node_modules,public,app}/**"
+      }
+    }
+  }
+  

@@ -1,0 +1,358 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles for your DApp */
+:root {
+  --primary-color: #ff9f66; /* Neon orange */
+  --background-color: #f8f9fa; /* Light grey background for the dashboard */
+  --danger-color: #ff4242; /* Bright red for 'Fail' indicators */
+  --success-color: #4caf50; /* Green for 'Pass' indicators */
+  --secondary-color: #007bff; /* Blue for 'Load Transactions' button */
+  --alert-color: #f0ad4e; /* Yellow for alerts */
+}
+
+body {
+  background-color: var(--background-color);
+  color: #333;
+  font-family: 'Inter', sans-serif;
+}
+
+.input-text {
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 8px 16px;
+  margin-bottom: 10px;
+  transition: border-color 0.3s;
+}
+
+.input-text:focus {
+  border-color: var(--primary-color);
+  outline: none;
+}
+
+.button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.button:hover {
+  background-color: #e6854c;
+}
+
+.button-secondary {
+  background-color: var(--secondary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.button-secondary:hover {
+  background-color: #0056b3;
+}
+
+.button-clear {
+  background-color: #6c757d; /* Grey color for 'Clear' button */
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.button-clear:hover {
+  background-color: #5a6268;
+}
+
+.section-header {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.pass-indicator {
+  color: var(--success-color);
+}
+
+.fail-indicator {
+  color: var(--danger-color);
+}
+
+/* Table Styles */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.th, .td {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+}
+
+.th {
+  background-color: #f0f0f0;
+}
+
+.tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.pass-indicator {
+  color: var(--success-color);
+  font-weight: bold;
+}
+
+.fail-indicator {
+  color: var(--danger-color);
+  font-weight: bold;
+}
+
+.status-fail {
+  background-color: var(--danger-color);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 5px;
+}
+
+.status-pass {
+  background-color: var(--success-color);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 5px;
+}
+
+.flagged-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-wrap: break-word;
+}
+
+.alert {
+  background-color: var(--alert-color);
+  color: #333;
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 15px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.summary-card {
+  border: 1px solid #ddd;
+}
+
+.summary-item {
+  align-items: center;
+}
+
+.text-primary-color {
+  color: var(--primary-color);
+}
+
+.text-danger-color {
+  color: var(--danger-color);
+}
+
+.text-warning-color {
+  color: #ffc107;
+}
+
+.text-success-color {
+  color: var(--success-color);
+}
+
+/* Sidebar Styling */
+.sidebar {
+  width: 240px;
+  background-color: white;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-right: 1px solid #e0e0e0;
+  overflow-y: auto;
+}
+
+.nav-menu ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.nav-menu li {
+  padding: 12px 0;
+  font-size: 16px;
+  color: #757575;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-menu li.active,
+.nav-menu li:hover {
+  color: #ff7e2f;
+  font-weight: bold;
+}
+
+/* Main Content Area */
+.main-content {
+  flex: 1;
+  padding: 40px;
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.connect-button {
+  background-color: #ff7e2f;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+}
+
+.wallet-input-container {
+  flex: 1;
+  margin: 0 20px;
+}
+
+.wallet-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.filter-button {
+  background-color: #f1f0eb;
+  color: #333;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Grid Styling */
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.grid-item {
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.icon-placeholder {
+  margin-bottom: 10px;
+}
+
+.grid-item p {
+  font-size: 14px;
+  color: #757575;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 200px;
+  }
+
+  .grid-container {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding-top: 60px; /* Adjust to create space for the fixed header */
+  }
+  
+  .sticky-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+  }
+
+  .nav-menu ul {
+    display: flex;
+    justify-content: space-around;
+  }
+
+  .nav-menu li {
+    padding: 10px;
+    font-size: 14px;
+  }
+}
+
+
+@media (max-width: 640px) {
+  .sidebar {
+    width: 160px;
+  }
+
+  .grid-container {
+    grid-template-columns: 1fr;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .wallet-input-container {
+    margin: 10px 0;
+    width: 100%;
+  }
+
+  .filter-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
