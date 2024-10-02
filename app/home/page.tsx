@@ -1,7 +1,8 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { getAuth, signOut } from 'firebase/auth'; // Import signOut function
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell } from '@fortawesome/free-solid-svg-icons';
+import { faBell, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 import Image from 'next/image';
 import {
   connectWallet,
@@ -41,7 +42,7 @@ import Notifications from '../alerts/notifications';
 const getAlerts = async () => {
   return new Promise<string[]>((resolve) => {
     setTimeout(() => {
-      resolve(['New wallet alert', 'Agent task completed']); // Example alerts
+      resolve([]); // Example alerts
     }, 1000);
   });
 };
@@ -61,6 +62,7 @@ const sideMenuTools = [
   { id: 7, name: 'AgentManager', label: 'Agent Manager', icon: Robot, active: true },
   { id: 8, name: 'ShareDashboardModal', label: 'Share with Client', icon: ContractIcon, active: true },
   { id: 9, name: 'UpgradePlanModal', label: 'Upgrade Plan', icon: LightningIcon, active: true },
+  { id: 10, name: 'Notifications', label: 'Notifications', icon: faBell, active: true },
 ];
 
 // Standard categories for grid tools
@@ -123,6 +125,12 @@ const DashboardV3: React.FC = () => {
     }
   };
 
+  const handleLogout = async () => {
+    const auth = getAuth();
+    await signOut(auth); // Sign out the user from Firebase
+    window.location.href = '/'; // Redirect the user back to the root page
+  };
+
   const handleDisconnectWallet = (account: string) => {
     const updatedAccounts = connectedAccounts.filter((acc) => acc.account !== account);
     setConnectedAccounts(updatedAccounts);
@@ -177,6 +185,7 @@ const DashboardV3: React.FC = () => {
   };
 
   const handleToolClick = (tool: string) => {
+    setShowNotifications(false); // Reset notifications display
     setActiveTool(tool);
     setRecents((prev) => [tool, ...prev.filter((item) => item !== tool)].slice(0, 5));
   };
@@ -189,11 +198,15 @@ const DashboardV3: React.FC = () => {
 
   const handleNotificationClick = () => {
     setShowNotifications(!showNotifications); // Toggle notifications display
+    setActiveTool('Notifications'); // Set active tool to Notifications
   };
 
   const renderActiveTool = () => {
-    const tool = tools.find((t) => t.name === activeTool);
+    if (showNotifications && activeTool === 'Notifications') {
+      return <Notifications />; // Render Notifications component when bell icon is clicked
+    }
 
+    const tool = tools.find((t) => t.name === activeTool);
     if (tool) {
       switch (tool.name) {
         case 'SecurityCheck':
@@ -221,7 +234,7 @@ const DashboardV3: React.FC = () => {
       case 'UpgradePlanModal':
         return <UpgradePlanModal />;
       case 'Notifications':
-        return <Notifications />; // Render Notifications component
+        return <Notifications />;
       default:
         return renderToolGrid();
     }
@@ -263,7 +276,7 @@ const DashboardV3: React.FC = () => {
       {showWalletModal && (
         <WalletSelectionModal onSelect={handleWalletSelect} onClose={() => setShowWalletModal(false)} />
       )}
-
+  
       <div className="sidebar">
         <div className="logo">
           <Image src="/agent.png" alt="iDEFi.AI Logo" width={150} height={50} className="logo-image" />
@@ -273,7 +286,7 @@ const DashboardV3: React.FC = () => {
             <li className={activeTool === null ? 'active' : ''} onClick={() => setActiveTool(null)}>
               <AdvisorIcon /> Agent Tools
             </li>
-
+  
             <li onClick={() => setRecentsOpen(!recentsOpen)}>
               <GraphIcon /> Recents {recentsOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
             </li>
@@ -286,7 +299,7 @@ const DashboardV3: React.FC = () => {
                 ))}
               </ul>
             )}
-
+  
             <li onClick={() => setFavoritesOpen(!favoritesOpen)}>
               <StarIcon /> Favorites {favoritesOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
             </li>
@@ -299,7 +312,7 @@ const DashboardV3: React.FC = () => {
                 ))}
               </ul>
             )}
-
+  
             {/* Create Agent button with dropdown */}
             <li onClick={toggleCreateAgentDropdown}>
               <Robot /> Create Agent {createAgentDropdownOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
@@ -311,34 +324,40 @@ const DashboardV3: React.FC = () => {
                 <li onClick={() => handleToolClick('AgentManager')}>Agent Manager</li>
               </ul>
             )}
-
-            {/* Share with Client button triggers the modal */}
+  
+            {/* Notifications Bell */}
+            <li className="notification-item" onClick={handleNotificationClick}>
+              <FontAwesomeIcon icon={faBell} className={activeAlerts.length > 0 ? 'alert-active' : ''} />
+              <span>Notifications</span>
+              {activeAlerts.length > 0 && <span className="notification-count">{activeAlerts.length}</span>}
+            </li>
+  
+            {/* Share with Client */}
             <li onClick={() => handleToolClick('ShareDashboardModal')}>
               <ContractIcon /> Share with Client
             </li>
-
-            {/* Upgrade Plan button triggers the upgrade plan modal */}
+  
+            {/* Upgrade Plan */}
             <li onClick={() => handleToolClick('UpgradePlanModal')}>
               <LightningIcon /> Upgrade Plan
             </li>
           </ul>
-
-          {/* Notification Icon */}
-          <div className="notification-icon" onClick={handleNotificationClick}>
-            <FontAwesomeIcon icon={faBell} size="2x" className={activeAlerts.length > 0 ? 'alert-active' : ''} />
-            {activeAlerts.length > 0 && (
-              <span className="notification-count">{activeAlerts.length}</span>
-            )}
-          </div>
-
-          <p className="beta-notice">
-            <Alert /> This is a Beta version of our Demo. Please be aware that some of the features and access to certain tools will be limited.
-          </p>
+  
+          {/* Logout Button */}
+          <ul>
+            <li className="logout-button" onClick={handleLogout}>
+              <FontAwesomeIcon icon={faSignOutAlt} /> Log Out
+            </li>
+          </ul>
+          <div className="beta-notice">
+          <Alert /> This is a Beta version of our Demo. Please be aware that some features and tools may be limited.
+        </div>
         </nav>
       </div>
-
+  
       <div className="main-content bg-background-color">
         <div className="header">
+          {/* Wallet management section */}
           <div className="wallet-management">
             <div className="wallet-summary" onClick={toggleDropdown}>
               <span>{mainAccount ? shortenAddress(mainAccount) : 'No Wallet Connected'}</span>
@@ -376,6 +395,8 @@ const DashboardV3: React.FC = () => {
               Connect and Sync Your Wallets
             </button>
           </div>
+  
+          {/* Wallet Input */}
           <div className="wallet-input-container">
             <input
               type="text"
@@ -389,6 +410,8 @@ const DashboardV3: React.FC = () => {
               Add
             </button>
           </div>
+  
+          {/* Filters */}
           <div className="filter-buttons">
             <button
               className={`filter-button ${activeCategory === 'ALL' ? 'active' : ''}`}
@@ -422,11 +445,9 @@ const DashboardV3: React.FC = () => {
             </button>
           </div>
         </div>
-
+  
+        {/* Active Tool Rendering */}
         {renderActiveTool()}
-
-        {/* Render Notifications component when bell icon is clicked */}
-        {showNotifications && <Notifications />}
       </div>
 
       <style jsx>{`
@@ -710,25 +731,41 @@ const DashboardV3: React.FC = () => {
           color: #FF7E2F;
         }
 
-        .notification-icon {
-          margin-top: 20px;
-          position: relative;
+        .notification-item {
+          display: flex;
+          align-items: center; /* Vertically align the icon and text */
+          justify-content: flex-start; /* Align items to the left */
+          gap: 10px;
+          padding: 15px 20px;
+          font-size: 16px;
+          color: #757575;
           cursor: pointer;
+          border-radius: 8px;
+          transition: background-color 0.3s, color 0.3s;
+          position: relative; /* Relative positioning to ensure alignment */
         }
 
-        .notification-icon .alert-active {
-          color: red;
+        .notification-item:hover {
+          color: #FF7E2F;
+          background-color: #f2f2f2;
         }
 
         .notification-count {
-          position: absolute;
-          top: -5px;
-          right: -5px;
           background-color: red;
           color: white;
           border-radius: 50%;
           padding: 3px 7px;
           font-size: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 20px;
+          height: 20px;
+          margin-left: 10px; /* Align with the text and bell */
+        }
+
+        .alert-active {
+          color: red;
         }
 
         .beta-notice {

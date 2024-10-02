@@ -3,32 +3,28 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import {
-  auth,
   signInWithGoogle,
   signInWithEmailPassword,
   createAccountWithEmailPassword,
-  listenToTransactions,
-  pushAiInsights,
-} from '@/utilities/firebaseClient'; // Assuming firebaseClient.ts is in the same directory
+} from '@/utilities/firebaseClient';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 
 const PartnerPortal: React.FC = () => {
   const [user, setUser] = useState<any>(null); // Current authenticated user
   const [email, setEmail] = useState<string>(''); // Email for sign-in/registration
   const [password, setPassword] = useState<string>(''); // Password for sign-in/registration
-  const [transactions, setTransactions] = useState<any[]>([]); // Transactions data
-  const [insights, setInsights] = useState<any>(null); // AI insights
   const [loading, setLoading] = useState<boolean>(true); // Loading state
   const [error, setError] = useState<string | null>(null); // Error handling
 
   useEffect(() => {
-    // Check if the user is already authenticated
     const authInstance = getAuth();
     const unsubscribe = onAuthStateChanged(authInstance, (authUser) => {
       if (authUser) {
         setUser(authUser);
-        fetchTransactions();
-        fetchInsights();
+        // After showing welcome message, redirect to /home after a delay (e.g., 3 seconds)
+        setTimeout(() => {
+          window.location.href = '/home'; // Redirect to /home
+        }, 3000);
       } else {
         setUser(null);
       }
@@ -37,30 +33,6 @@ const PartnerPortal: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
-
-  const fetchTransactions = () => {
-    listenToTransactions((data) => {
-      if (data) {
-        setTransactions(data);
-      }
-    });
-  };
-
-  const fetchInsights = async () => {
-    if (user) {
-      try {
-        const insightData = await pushAiInsights({
-          userAddress: user.email,
-          insights: 'Fetching latest insights from Turnqey',
-          timestamp: Date.now(),
-        });
-        setInsights(insightData);
-      } catch (err) {
-        setError('Failed to fetch insights');
-        console.error('Error fetching insights:', err);
-      }
-    }
-  };
 
   // Sign in using Google
   const handleGoogleSignIn = async () => {
@@ -105,7 +77,7 @@ const PartnerPortal: React.FC = () => {
   const handleSignOut = async () => {
     try {
       setLoading(true);
-      await signOut(auth);
+      await signOut(getAuth());
       setUser(null);
     } catch (err) {
       console.error('Error signing out:', err);
@@ -116,7 +88,7 @@ const PartnerPortal: React.FC = () => {
 
   return (
     <div className="bg-gradient-to-r from-purple-500 to-indigo-600 min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
+      <div className="max-w-md w-full space-y-10 bg-white p-10 rounded-xl shadow-lg">
         {/* Partner Branding */}
         <div className="text-center">
           <Image
@@ -128,9 +100,8 @@ const PartnerPortal: React.FC = () => {
           />
         </div>
 
-        {/* Sign-in Options */}
         {!user ? (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <h2 className="text-2xl font-semibold text-center text-gray-800">Sign in to your account</h2>
 
             <button
@@ -141,8 +112,15 @@ const PartnerPortal: React.FC = () => {
               Sign in with Google
             </button>
 
+            {/* OR Separator */}
+            <div className="flex items-center justify-center space-x-2">
+              <div className="border-t border-gray-300 flex-grow"></div>
+              <span className="text-gray-500">OR</span>
+              <div className="border-t border-gray-300 flex-grow"></div>
+            </div>
+
             {/* Email/Password Sign In */}
-            <div className="mt-4 space-y-3">
+            <div className="space-y-4">
               <input
                 type="email"
                 value={email}
@@ -161,7 +139,7 @@ const PartnerPortal: React.FC = () => {
                 onClick={handleEmailSignIn}
                 className="w-full bg-blue-500 text-white py-3 px-4 rounded-full hover:bg-blue-600 transition-all duration-300 shadow-lg"
               >
-                Sign in with Email/Password
+                Sign in with Email / Password
               </button>
               <button
                 onClick={handleCreateAccount}
@@ -176,44 +154,17 @@ const PartnerPortal: React.FC = () => {
         ) : (
           <div className="space-y-6">
             <h2 className="text-2xl font-semibold text-center text-gray-800">
-              Welcome, {user.displayName || user.email}
+              Welcome, {user.displayName || user.email} {/* Greeting the user */}
             </h2>
-            <button
-              onClick={handleSignOut}
-              className="w-full bg-gray-700 text-white py-3 px-4 rounded-full hover:bg-gray-800 transition-all duration-300 shadow-lg"
-            >
-              Sign Out
-            </button>
 
-            {/* Placeholder for Data Visualization */}
-            <div className="bg-gray-100 p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-semibold mb-4">Your Transactions</h3>
-              {transactions.length > 0 ? (
-                <ul className="space-y-2">
-                  {transactions.map((tx, index) => (
-                    <li
-                      key={index}
-                      className="p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition"
-                    >
-                      <p><strong>Type:</strong> {tx.type}</p>
-                      <p><strong>Amount:</strong> {tx.usdAmount} USD</p>
-                      <p><strong>Date:</strong> {tx.timestamp}</p>
-                      <p><strong>IDAC Score:</strong> {tx.thirdPartyIdacScore}</p>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-gray-600">No transactions found.</p>
-              )}
+            {/* Show a loading indicator before redirecting */}
+            <div className="flex justify-center items-center mt-4">
+              <svg className="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <p className="text-indigo-600 ml-3">Redirecting to dashboard...</p>
             </div>
-
-            {/* Placeholder for AI Insights */}
-            {insights && (
-              <div className="bg-gray-100 p-6 rounded-lg shadow-md">
-                <h3 className="text-xl font-semibold">AI Insights</h3>
-                <p className="text-gray-700">{insights.insights}</p>
-              </div>
-            )}
           </div>
         )}
       </div>

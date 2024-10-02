@@ -28,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Centering the header content */}
         <header className="w-full bg-white shadow-md py-8 flex justify-center items-center">
           <div className="text-xl font-semibold flex items-center">
-            <img src="/agent-header.png" alt="iDeFi.AI" className="h-12 inline-block" />
+            <img src="/aigents.png" alt="iDeFi.AI" className="h-12 inline-block" />
             <span className="ml-2">(beta)</span>
           </div>
         </header>
