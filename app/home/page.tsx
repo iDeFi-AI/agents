@@ -1,8 +1,8 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { getAuth, signOut } from 'firebase/auth'; // Import signOut function
+import { getAuth, signOut } from 'firebase/auth'; 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
+import { faBell, faSignOutAlt, faBars, faTimes } from '@fortawesome/free-solid-svg-icons'; // Added faBars and faTimes for mobile sidebar
 import Image from 'next/image';
 import {
   connectWallet,
@@ -47,7 +47,6 @@ const getAlerts = async () => {
   });
 };
 
-// Main tools for the grid (excluding CreateAgent, AgentBoard, AgentManager, etc.)
 const tools = [
   { id: 1, name: 'SecurityCheck', label: 'Security Check', icon: ShieldIcon, active: true },
   { id: 2, name: 'FinancialRoadmap', label: 'Financial Roadmap', icon: GraphIcon, active: true },
@@ -55,7 +54,6 @@ const tools = [
   { id: 4, name: 'VisualizeWallet', label: 'Visualize Wallet', icon: BalanceIcon, active: true },
 ];
 
-// Sidebar items like CreateAgent, AgentBoard, AgentManager, ShareDashboardModal
 const sideMenuTools = [
   { id: 5, name: 'CreateAgent', label: 'Create Agent', icon: Robot, active: true },
   { id: 6, name: 'AgentBoard', label: 'Agent Board', icon: Robot, active: true },
@@ -65,7 +63,6 @@ const sideMenuTools = [
   { id: 10, name: 'Notifications', label: 'Notifications', icon: faBell, active: true },
 ];
 
-// Standard categories for grid tools
 const categories = {
   ALL: tools.map((tool) => tool.name),
   PLANNING: ['FinancialRoadmap', 'InvestmentSimulator'],
@@ -89,7 +86,8 @@ const DashboardV3: React.FC = () => {
   const [showDropdown, setShowDropdown] = useState<boolean>(false);
   const [createAgentDropdownOpen, setCreateAgentDropdownOpen] = useState<boolean>(false);
   const [activeAlerts, setActiveAlerts] = useState<string[]>([]);
-  const [showNotifications, setShowNotifications] = useState<boolean>(false); // State for showing notifications
+  const [showNotifications, setShowNotifications] = useState<boolean>(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); // Added state for sidebar toggle
 
   useEffect(() => {
     if (connectedAccounts.length > 0) {
@@ -97,7 +95,6 @@ const DashboardV3: React.FC = () => {
     }
   }, [connectedAccounts]);
 
-  // Fetch alerts on mount
   useEffect(() => {
     const fetchAlerts = async () => {
       const alerts = await getAlerts();
@@ -127,8 +124,8 @@ const DashboardV3: React.FC = () => {
 
   const handleLogout = async () => {
     const auth = getAuth();
-    await signOut(auth); // Sign out the user from Firebase
-    window.location.href = '/'; // Redirect the user back to the root page
+    await signOut(auth);
+    window.location.href = '/';
   };
 
   const handleDisconnectWallet = (account: string) => {
@@ -151,6 +148,10 @@ const DashboardV3: React.FC = () => {
 
   const toggleCreateAgentDropdown = () => {
     setCreateAgentDropdownOpen(!createAgentDropdownOpen);
+  };
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
   };
 
   const shortenAddress = (address: string) => {
@@ -185,7 +186,7 @@ const DashboardV3: React.FC = () => {
   };
 
   const handleToolClick = (tool: string) => {
-    setShowNotifications(false); // Reset notifications display
+    setShowNotifications(false);
     setActiveTool(tool);
     setRecents((prev) => [tool, ...prev.filter((item) => item !== tool)].slice(0, 5));
   };
@@ -197,13 +198,13 @@ const DashboardV3: React.FC = () => {
   };
 
   const handleNotificationClick = () => {
-    setShowNotifications(!showNotifications); // Toggle notifications display
-    setActiveTool('Notifications'); // Set active tool to Notifications
+    setShowNotifications(!showNotifications);
+    setActiveTool('Notifications');
   };
 
   const renderActiveTool = () => {
     if (showNotifications && activeTool === 'Notifications') {
-      return <Notifications />; // Render Notifications component when bell icon is clicked
+      return <Notifications />;
     }
 
     const tool = tools.find((t) => t.name === activeTool);
@@ -277,9 +278,13 @@ const DashboardV3: React.FC = () => {
         <WalletSelectionModal onSelect={handleWalletSelect} onClose={() => setShowWalletModal(false)} />
       )}
   
-      <div className="sidebar">
+      <button className="hamburger-button" onClick={toggleSidebar}>
+        <FontAwesomeIcon icon={isSidebarOpen ? faTimes : faBars} />
+      </button>
+
+      <div className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="logo">
-          <Image src="/agent.png" alt="iDEFi.AI Logo" width={150} height={50} className="logo-image" />
+          <Image src="/agent.png" alt="iDEFi.AI Logo" width={100} height={50} className="logo-image" />
         </div>
         <nav className="nav-menu">
           <ul>
@@ -390,25 +395,26 @@ const DashboardV3: React.FC = () => {
                 ))}
               </div>
             )}
+
             <button onClick={handleConnectWallet} className="connect-button">
               <KeyIcon style={{ marginRight: '8px' }} />
               Connect and Sync Your Wallets
             </button>
-          </div>
-  
-          {/* Wallet Input */}
-          <div className="wallet-input-container">
-            <input
-              type="text"
-              className="wallet-input"
-              value={manualAddress}
-              placeholder="Enter Wallet Address . . ."
-              onChange={handleManualInput}
-            />
-            <button onClick={addManualAddress} className="add-button">
-              <PlusIcon style={{ marginRight: '8px' }} />
-              Add
-            </button>
+
+             {/* Wallet input and Add button inside the same container */}
+            <div className="wallet-input-container">
+              <input
+                type="text"
+                className="wallet-input"
+                value={manualAddress}
+                placeholder="Enter Wallet Address..."
+                onChange={handleManualInput}
+              />
+              <button onClick={addManualAddress} className="add-button">
+                <PlusIcon style={{ marginRight: '8px' }} />
+                Add
+              </button>
+            </div>
           </div>
   
           {/* Filters */}
@@ -458,6 +464,19 @@ const DashboardV3: React.FC = () => {
           overflow: hidden;
         }
 
+        .hamburger-button {
+          position: fixed;
+          top: 37px;
+          left: 23px;
+          z-index: 1002;
+          background-color: transparent;
+          border: none;
+          color: #333;
+          font-size: 24px;
+          cursor: pointer;
+          display: none;
+        }
+
         .sidebar {
           width: 240px;
           background-color: white;
@@ -468,7 +487,12 @@ const DashboardV3: React.FC = () => {
           align-items: center;
           border-right: 1px solid #E0E0E0;
           overflow-y: auto;
+          z-index: 1001;
           transition: all 0.3s ease;
+        }
+
+        .sidebar.open {
+          left: 0;
         }
 
         .logo {
@@ -525,22 +549,6 @@ const DashboardV3: React.FC = () => {
         .sub-menu li:hover {
           color: #FF7E2F;
           background-color: #f2f2f2;
-        }
-
-        .upgrade-section {
-          margin-top: auto;
-          text-align: center;
-        }
-
-        .upgrade-button {
-          background-color: #FF7E2F;
-          color: white;
-          padding: 10px 20px;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          font-size: 14px;
-          margin-bottom: 10px;
         }
 
         .main-content {
@@ -631,13 +639,12 @@ const DashboardV3: React.FC = () => {
         .wallet-input-container {
           display: flex;
           gap: 10px;
-          flex: 1;
-          margin-top: 10px;
           width: 100%;
+          margin-top: 10px;
         }
 
         .wallet-input {
-          width: 100%;
+          flex: 3; /* 75% of the container width */
           padding: 10px;
           border: 1px solid #E0E0E0;
           border-radius: 8px;
@@ -645,15 +652,17 @@ const DashboardV3: React.FC = () => {
         }
 
         .add-button {
+          flex: 1; /* 25% of the container width */
           background-color: #007bff;
           color: white;
-          padding: 10px 20px;
+          padding: 10px;
           border: none;
           border-radius: 8px;
           cursor: pointer;
           font-size: 16px;
           display: flex;
           align-items: center;
+          justify-content: center;
         }
 
         .filter-buttons {
@@ -733,8 +742,8 @@ const DashboardV3: React.FC = () => {
 
         .notification-item {
           display: flex;
-          align-items: center; /* Vertically align the icon and text */
-          justify-content: flex-start; /* Align items to the left */
+          align-items: center; 
+          justify-content: flex-start;
           gap: 10px;
           padding: 15px 20px;
           font-size: 16px;
@@ -742,7 +751,7 @@ const DashboardV3: React.FC = () => {
           cursor: pointer;
           border-radius: 8px;
           transition: background-color 0.3s, color 0.3s;
-          position: relative; /* Relative positioning to ensure alignment */
+          position: relative;
         }
 
         .notification-item:hover {
@@ -761,7 +770,7 @@ const DashboardV3: React.FC = () => {
           justify-content: center;
           min-width: 20px;
           height: 20px;
-          margin-left: 10px; /* Align with the text and bell */
+          margin-left: 10px;
         }
 
         .alert-active {
@@ -802,42 +811,25 @@ const DashboardV3: React.FC = () => {
             grid-template-columns: 1fr;
           }
 
+          .hamburger-button {
+            display: block;
+          }
+
           .sidebar {
-            width: 100%;
-            padding: 10px;
+            width: 240px;
             position: fixed;
             top: 0;
+            bottom: 0;
+            left: -100%;
+            transition: left 0.3s ease;
+          }
+
+          .sidebar.open {
             left: 0;
-            right: 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-direction: row;
-            z-index: 1000;
-            border-right: none;
-            border-bottom: 1px solid #E0E0E0;
-            background-color: white;
-            transition: all 0.3s ease;
-          }
-
-          .nav-menu ul {
-            flex-direction: row;
-            justify-content: space-evenly;
-            flex-wrap: wrap;
-            padding: 10px;
-            width: 100%;
-          }
-
-          .nav-menu li {
-            flex: 1 0 45%;
-            text-align: center;
-            padding: 10px 0;
-            font-size: 14px;
           }
 
           .main-content {
-            padding: 80px 10px 20px 10px;
-            margin-top: 300px;
+            padding: 20px 10px 20px 10px;
           }
 
           .wallet-management {
