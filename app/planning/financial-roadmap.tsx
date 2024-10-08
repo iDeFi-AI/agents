@@ -1,87 +1,167 @@
-import React, { useState, useEffect } from "react";
-import { connectWallet, syncWalletData } from "@/utilities/web3Utils";
-import { fetchTransactionSummary } from "@/utilities/apiUtils";
-import WalletSelectionModal from "@/components/wallets"; // Assume you have a modal for wallet selection
+import React, { useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faChartLine, faShieldAlt, faPiggyBank, faCoins, faInfoCircle } from '@fortawesome/free-solid-svg-icons';
+import Tippy from '@tippyjs/react';
+import 'tippy.js/dist/tippy.css';
+import { connectWallet, syncWalletData } from '@/utilities/web3Utils'; // Import syncWalletData
+import WalletSelectionModal from '@/components/wallets';
 
 const FinancialRoadmap: React.FC = () => {
-  const [address, setAddress] = useState<string | null>(null); // Wallet address state
-  const [summary, setSummary] = useState<any | null>(null);
-  const [loading, setLoading] = useState<boolean>(false); // Loading state for fetching summary
-  const [connected, setConnected] = useState<boolean>(false); // Whether the wallet is connected
-  const [showWalletModal, setShowWalletModal] = useState<boolean>(false); // Show wallet modal
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [roadmapData, setRoadmapData] = useState<any>(null);
+  const [quantumData, setQuantumData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
-  // Function to handle wallet connection
-  const handleConnectWallet = (providerName: string) => {
-    setLoading(true); // Set loading when connecting wallet
-    connectWallet(providerName)
-      .then((accounts) => {
-        if (accounts && accounts.length > 0) {
-          setAddress(accounts[0]); // Set the connected wallet address
-          syncWalletData(accounts); // Sync wallet data if necessary
-          setConnected(true);
-          setShowWalletModal(false); // Close modal after successful connection
-        }
-      })
-      .catch((error) => {
-        console.error("Error connecting to wallet:", error);
-        setConnected(false);
-      })
-      .finally(() => {
-        setLoading(false); // Stop loading once connection is complete
-      });
+  const handleWalletSelect = async (provider: string) => {
+    try {
+      const accounts = await connectWallet(provider);
+      if (accounts && accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+        await syncWalletData(accounts); // Sync wallet data
+        fetchRoadmapData(accounts[0]);
+        fetchQuantumData(accounts[0]);
+        setIsModalOpen(false); // Close modal after connection
+      } else {
+        setError('No accounts found. Please check your wallet.');
+      }
+    } catch (err) {
+      setError('Failed to connect to wallet.');
+    }
   };
 
-  // Fetch the transaction summary when an address is available
-  useEffect(() => {
-    if (address) {
-      setLoading(true);
-      fetchTransactionSummary(address)
-        .then((response) => {
-          setSummary(response);
-          setLoading(false);
-        })
-        .catch((error) => {
-          console.error("Error fetching financial roadmap data:", error);
-          setLoading(false);
-        });
+  const fetchRoadmapData = async (address: string) => {
+    try {
+      const response = await fetch('https://api.idefi.ai/api/basic_metrics', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ address }),
+      });
+      const data = await response.json();
+      setRoadmapData(data);
+    } catch (error) {
+      setError('Error fetching roadmap data.');
+      console.error('Error fetching roadmap data:', error);
     }
-  }, [address]);
+  };
+
+  const fetchQuantumData = async (address: string) => {
+    try {
+      const response = await fetch('https://q.idefi.ai/api/quantum_risk_analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ portfolio: { walletAddress: address } }),
+      });
+      const data = await response.json();
+      setQuantumData(data.risk_analysis);
+    } catch (error) {
+      setError('Error fetching quantum data.');
+      console.error('Error fetching quantum data:', error);
+    }
+  };
 
   return (
-    <div className="main-content bg-background-color flex flex-col items-center text-center p-6 min-h-screen">
-      <h1 className="section-header text-3xl font-bold mb-8">Financial Roadmap</h1>
+    <div className="financial-roadmap bg-white p-8 rounded-lg shadow-md">
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">Your Financial Roadmap</h1>
 
-      {!connected ? (
-        <div>
-          <button
-            onClick={() => setShowWalletModal(true)}
-            className="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300"
-          >
-            Connect Wallet
-          </button>
-        </div>
-      ) : (
-        <div className="card p-6 w-full max-w-3xl">
-          <p className="text-lg mb-4">Roadmap for account: {address}</p>
-          {loading ? (
-            <div>Loading financial roadmap...</div>
-          ) : summary ? (
-            <div>
-              <p className="font-medium text-gray-700 mb-2">Transaction Summary:</p>
-              <pre className="bg-gray-100 p-4 rounded-lg">{JSON.stringify(summary, null, 2)}</pre>
+      {/* Wallet Connect Button */}
+      <button
+        onClick={() => setIsModalOpen(true)}
+        className="bg-blue-600 text-white py-2 px-4 rounded-md mb-6"
+      >
+        Connect Wallet
+      </button>
+
+      {/* WalletSelectionModal */}
+      {isModalOpen && (
+        <WalletSelectionModal
+          onSelect={handleWalletSelect}
+          onClose={() => setIsModalOpen(false)}
+        />
+      )}
+
+      {walletAddress && <p className="text-green-600 mt-4">Connected: {walletAddress}</p>}
+      {error && <p className="text-red-600 mt-4">{error}</p>}
+
+      {/* Display Roadmap Data */}
+      {walletAddress && roadmapData && (
+        <div className="roadmap-steps grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
+          {/* Wealth Plan Step */}
+          <div className="roadmap-step bg-blue-100 p-6 rounded-lg shadow-md">
+            <div className="step-header flex items-center">
+              <FontAwesomeIcon icon={faChartLine} className="text-blue-600 text-2xl mr-4" />
+              <h2 className="text-xl font-semibold">Wealth Plan</h2>
+              <Tippy content="Your long-term financial strategy for building wealth." trigger="mouseenter">
+                <FontAwesomeIcon icon={faInfoCircle} className="text-gray-500 ml-2" />
+              </Tippy>
             </div>
-          ) : (
-            <p>No summary available for this address.</p>
+            <p className="mt-4 text-gray-700">{roadmapData?.wealth_plan || 'Loading...'}</p>
+          </div>
+
+          {/* Savings Strategy Step */}
+          <div className="roadmap-step bg-green-100 p-6 rounded-lg shadow-md">
+            <div className="step-header flex items-center">
+              <FontAwesomeIcon icon={faPiggyBank} className="text-green-600 text-2xl mr-4" />
+              <h2 className="text-xl font-semibold">Savings Strategy</h2>
+              <Tippy content="Recommended savings strategies based on your income and goals." trigger="mouseenter">
+                <FontAwesomeIcon icon={faInfoCircle} className="text-gray-500 ml-2" />
+              </Tippy>
+            </div>
+            <p className="mt-4 text-gray-700">{roadmapData?.savings_strategy || 'Loading...'}</p>
+          </div>
+
+          {/* Risk Management Step */}
+          <div className="roadmap-step bg-yellow-100 p-6 rounded-lg shadow-md">
+            <div className="step-header flex items-center">
+              <FontAwesomeIcon icon={faShieldAlt} className="text-yellow-600 text-2xl mr-4" />
+              <h2 className="text-xl font-semibold">Risk Management</h2>
+              <Tippy content="Managing risk through a diversified portfolio." trigger="mouseenter">
+                <FontAwesomeIcon icon={faInfoCircle} className="text-gray-500 ml-2" />
+              </Tippy>
+            </div>
+            <p className="mt-4 text-gray-700">{roadmapData?.risk_management || 'Loading...'}</p>
+          </div>
+
+          {/* Investment Growth Step */}
+          <div className="roadmap-step bg-red-100 p-6 rounded-lg shadow-md">
+            <div className="step-header flex items-center">
+              <FontAwesomeIcon icon={faCoins} className="text-red-600 text-2xl mr-4" />
+              <h2 className="text-xl font-semibold">Investment Growth</h2>
+              <Tippy content="Strategies for growing your investments over time." trigger="mouseenter">
+                <FontAwesomeIcon icon={faInfoCircle} className="text-gray-500 ml-2" />
+              </Tippy>
+            </div>
+            <p className="mt-4 text-gray-700">{roadmapData?.investment_growth || 'Loading...'}</p>
+          </div>
+
+          {/* Quantum Risk Analysis (Q.Idefi.AI) */}
+          {quantumData && (
+            <div className="roadmap-step bg-purple-100 p-6 rounded-lg shadow-md">
+              <div className="step-header flex items-center">
+                <FontAwesomeIcon icon={faShieldAlt} className="text-purple-600 text-2xl mr-4" />
+                <h2 className="text-xl font-semibold">Quantum Risk Analysis</h2>
+                <Tippy content="Analyze risk using quantum data." trigger="mouseenter">
+                  <FontAwesomeIcon icon={faInfoCircle} className="text-gray-500 ml-2" />
+                </Tippy>
+              </div>
+              <p className="mt-4 text-gray-700">{quantumData?.explanation || 'Loading quantum analysis...'}</p>
+            </div>
           )}
         </div>
       )}
 
-      {showWalletModal && (
-        <WalletSelectionModal
-          onSelect={handleConnectWallet}
-          onClose={() => setShowWalletModal(false)}
-        />
-      )}
+      <style jsx>{`
+        .roadmap-step {
+          transition: transform 0.2s ease;
+        }
+        .roadmap-step:hover {
+          transform: translateY(-5px);
+        }
+      `}</style>
     </div>
   );
 };

@@ -40,18 +40,34 @@ export const generateOpenAIPrompt = (
     )
     .join('\n');
 
-  const prompt = `
-    Analyze the Ethereum address ${userAddress} to identify patterns and relationships with other unique addresses found in the transaction details.
-    Focus on mapping out transaction patterns, identifying potential malicious activities, and relationships with flagged addresses (parents or children).
-    Based on the status of FAIL, PASS, or WARNING (${status}), provide recommendations for improving security and transaction practices.
-    IF the status is FAIL, indicate to not interact with the address.
-    IF the status is WARNING, caution about indirect involvement with flagged addresses and advise on preventive actions.
+    const prompt = `
+    As a wealth management professional working with clients in the crypto space, provide a comprehensive analysis for the Ethereum address ${userAddress} covering the following four main areas:
+    
+    1. **Security Check**: 
+       - Analyze transaction patterns to identify potential malicious activities and relationships with flagged addresses (parents or children).
+       - Based on the status of PASS, FAIL, or WARNING (${status}), provide actionable recommendations for improving security and transaction practices.
+         - If the status is **FAIL**, advise against interacting with the address.
+         - If the status is **WARNING**, caution about indirect involvement with flagged addresses and suggest preventive actions.
+    
+    2. **Financial Roadmap**: 
+       - Assess the transaction history to provide insights into the client's financial journey with cryptoassets.
+       - Identify trends, significant events, and suggest strategies for achieving long-term financial goals in the crypto space.
+    
+    3. **Financial Health**: 
+       - Evaluate the overall financial health of the client's crypto holdings based on their transaction history.
+       - Offer advice on diversification, risk management, and optimizing their crypto portfolio in line with best practices in wealth management.
+    
+    4. **Visualize Wallet**: 
+       - Provide a conceptual visualization of the client's wallet, highlighting asset allocation, transaction types, and relationships with other addresses.
+       - Use this visualization to enhance understanding and support strategic financial planning.
+    
+    **Transaction Details**:
     ${transactionDetails}
-  `;
-
-  console.log('Generated OpenAI Prompt:', prompt);
-
-  return prompt;
+      `;
+    
+      console.log('Generated OpenAI Prompt:', prompt);
+    
+      return prompt;
 };
 
 // Function to generate insights using OpenAI
@@ -68,7 +84,18 @@ export const generateInsights = async (
       messages: [
         {
           role: 'system',
-          content: `Provide insights and recommendations for Ethereum address ${userAddress}. The security status is: PASS, FAIL, or WARNING (${status}).`,
+          content: `
+          You are a seasoned wealth management professional specializing in cryptoassets. Your role is to provide comprehensive analyses and recommendations to clients based on their cryptocurrency transactions and holdings.
+
+          When analyzing the Ethereum address ${userAddress}, focus on the following four areas:
+
+          1. **Security Check**
+          2. **Financial Roadmap**
+          3. **Financial Health**
+          4. **Visualize Wallet**
+
+          Use the transaction details and the security status (${status}) provided to generate insightful, actionable advice. Ensure that your response is professional, clear, and tailored to the client's needs.
+          `,
         },
         { role: 'user', content: openAIPrompt },
       ],

@@ -24,7 +24,7 @@ export const connectWallet = async (providerName: string): Promise<string[] | nu
       if (provider) {
         const accounts = await provider.request({ method: 'eth_requestAccounts' });
         web3 = new Web3(provider);
-        return accounts;
+        return accounts; // Return all available accounts
       } else {
         console.error('No provider selected or provider not available');
         return null;
@@ -39,18 +39,22 @@ export const connectWallet = async (providerName: string): Promise<string[] | nu
   }
 };
 
-// Function to allow the user to select a provider if multiple are available
-const selectProvider = async (providers: any[]): Promise<any | null> => {
-  for (const provider of providers) {
-    // Identify provider types (MetaMask, Coinbase, etc.)
-    if (provider.isMetaMask) {
-      return provider; // Prefer MetaMask if available
-    } else if (provider.isCoinbaseWallet) {
-      return provider;
-    }
+// Function to display available accounts and allow the user to select one
+export const selectPreferredAccount = async (accounts: string[]): Promise<string | null> => {
+  if (accounts.length === 0) {
+    console.error("No accounts available");
+    return null;
   }
-  // Return the first provider if no preferred provider is found
-  return providers.length > 0 ? providers[0] : null;
+
+  if (accounts.length === 1) {
+    return accounts[0]; // If only one account, return it
+  }
+
+  // Implement a UI modal or prompt here to allow users to select the preferred account
+  // For this example, let's assume the first account is selected (customize this as per your UX/UI)
+  console.log("Multiple accounts found, selecting the first one for now:");
+  console.log(accounts);
+  return accounts[0]; // Or modify this to select based on user input
 };
 
 // Function to disconnect the wallet
@@ -91,11 +95,11 @@ export const syncWalletData = async (accounts: string[]): Promise<void> => {
   }
 };
 
-// web3Utils.ts
+// Function to sign messages
 export const signMessage = async (message: string): Promise<string> => {
   try {
     if (web3 && typeof window !== 'undefined' && window.ethereum) {
-      const accounts = await web3.eth.getAccounts();
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
       if (accounts && accounts.length > 0) {
         const signature = await web3.eth.personal.sign(message, accounts[0], "");
         return signature;

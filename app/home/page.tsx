@@ -26,6 +26,7 @@ import {
   ContractIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  FileUpload
 } from '@/components/icons';
 import SecurityCheck from '../security/security-check';
 import FinancialRoadmap from '../planning/financial-roadmap';
@@ -37,6 +38,7 @@ import UpgradePlanModal from '../upgrade/UpgradePlanModal';
 import AgentBoard from '../agents/agent-board';
 import AgentManager from '../agents/agent-manager';
 import Notifications from '../alerts/notifications';
+import DataUpload from '@/components/data-upload';
 
 // Simulate fetching alerts from an API or database
 const getAlerts = async () => {
@@ -58,9 +60,10 @@ const sideMenuTools = [
   { id: 5, name: 'CreateAgent', label: 'Create Agent', icon: Robot, active: true },
   { id: 6, name: 'AgentBoard', label: 'Agent Board', icon: Robot, active: true },
   { id: 7, name: 'AgentManager', label: 'Agent Manager', icon: Robot, active: true },
-  { id: 8, name: 'ShareDashboardModal', label: 'Share with Client', icon: ContractIcon, active: true },
-  { id: 9, name: 'UpgradePlanModal', label: 'Upgrade Plan', icon: LightningIcon, active: true },
-  { id: 10, name: 'Notifications', label: 'Notifications', icon: faBell, active: true },
+  { id: 8, name: 'DataUpload', label: 'Dataset', icon: FileUpload, active: true }, // New Dataset Upload Tool
+  { id: 9, name: 'ShareDashboardModal', label: 'Share with Client', icon: ContractIcon, active: true },
+  { id: 10, name: 'UpgradePlanModal', label: 'Upgrade Plan', icon: LightningIcon, active: true },
+  { id: 11, name: 'Notifications', label: 'Notifications', icon: faBell, active: true },
 ];
 
 const categories = {
@@ -88,6 +91,7 @@ const DashboardV3: React.FC = () => {
   const [activeAlerts, setActiveAlerts] = useState<string[]>([]);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false); // Added state for sidebar toggle
+  const [uploadedData, setUploadedData] = useState<any[]>([]);
 
   useEffect(() => {
     if (connectedAccounts.length > 0) {
@@ -121,6 +125,11 @@ const DashboardV3: React.FC = () => {
       alert('Failed to connect wallet. Please try again.');
     }
   };
+
+  const handleDataSync = (data: any) => {
+    setUploadedData(data);
+  };
+
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -230,6 +239,8 @@ const DashboardV3: React.FC = () => {
         return <AgentBoard />;
       case 'AgentManager':
         return <AgentManager />;
+      case 'DataUpload': // Render DataUpload when Dataset is selected
+        return <DataUpload />;
       case 'ShareDashboardModal':
         return <ShareDashboardModal />;
       case 'UpgradePlanModal':
@@ -289,7 +300,7 @@ const DashboardV3: React.FC = () => {
         <nav className="nav-menu">
           <ul>
             <li className={activeTool === null ? 'active' : ''} onClick={() => setActiveTool(null)}>
-              <AdvisorIcon /> Agent Tools
+              <AdvisorIcon /> Agent Dash
             </li>
   
             <li onClick={() => setRecentsOpen(!recentsOpen)}>
@@ -320,23 +331,26 @@ const DashboardV3: React.FC = () => {
   
             {/* Create Agent button with dropdown */}
             <li onClick={toggleCreateAgentDropdown}>
-              <Robot /> Create Agent {createAgentDropdownOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+              <Robot /> Agent Tools {createAgentDropdownOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
             </li>
             {createAgentDropdownOpen && (
               <ul className="sub-menu">
                 <li onClick={() => handleToolClick('CreateAgent')}>Create New Agent</li>
                 <li onClick={() => handleToolClick('AgentBoard')}>Agent Board</li>
                 <li onClick={() => handleToolClick('AgentManager')}>Agent Manager</li>
+                <li onClick={() => handleToolClick('DataUpload')}>
+                <FileUpload />Datasets</li>
+                 {/* Notifications Bell */}
+                <li className="notification-item" onClick={handleNotificationClick}>
+                  <FontAwesomeIcon icon={faBell} className={activeAlerts.length > 0 ? 'alert-active' : ''} />
+                  <span>Notifications</span>
+                  {activeAlerts.length > 0 && <span className="notification-count">{activeAlerts.length}</span>}
+                </li>
               </ul>
             )}
   
-            {/* Notifications Bell */}
-            <li className="notification-item" onClick={handleNotificationClick}>
-              <FontAwesomeIcon icon={faBell} className={activeAlerts.length > 0 ? 'alert-active' : ''} />
-              <span>Notifications</span>
-              {activeAlerts.length > 0 && <span className="notification-count">{activeAlerts.length}</span>}
-            </li>
-  
+           
+
             {/* Share with Client */}
             <li onClick={() => handleToolClick('ShareDashboardModal')}>
               <ContractIcon /> Share with Client
@@ -373,8 +387,13 @@ const DashboardV3: React.FC = () => {
                 {connectedAccounts.map(({ account, provider }, index) => (
                   <div key={index} className="wallet-info" onClick={() => setMainAccount(account)}>
                     <Image
-                      src={provider === 'MetaMask' ? '/metamask-logo.png' : '/coinbase-logo.png'}
-                      alt="Wallet Logo"
+                      src={
+                        provider === 'MetaMask'
+                          ? '/metamask-logo.png'
+                          : provider === 'Coinbase'
+                          ? '/coinbase-logo.png'
+                          : '/mainlogo.png' // Replace with your default logo for manual entries
+}                     alt="Wallet Logo"
                       width={24}
                       height={24}
                       className="wallet-logo"

@@ -5,22 +5,21 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import requests
 import base64
 import json
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, make_response
 from werkzeug.utils import secure_filename
 from api.create_agent import create_new_agent
 from api.nfa_image import generate_nft_image
 from uagents import Agent, Context
 import threading
-from firebase_admin import credentials, initialize_app, firestore
+from firebase_admin import credentials, initialize_app, firestore, storage
 from flask_cors import CORS
 import csv
+from io import BytesIO
+import datetime
+import pandas as pd
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": ["https://q.idefi.ai", "https://api.idefi.ai"]}})
-
-
-# Etherscan API Key (ensure to set this as an environment variable)
-ETHERSCAN_API_KEY = os.getenv("NEXT_PUBLIC_ETHERSCAN_API_KEY")
+CORS(app, resources={r"/api/*": {"origins": ["https://q.idefi.ai", "https://api.idefi.ai", "https://agents.idefi.ai", "https://idefi.ai", "https://mup-nine.vercel.app", "http://localhost:3000"]}})
 
 # Firebase setup
 firebase_service_account_key_base64 = os.getenv('NEXT_PUBLIC_FIREBASE_SERVICE_ACCOUNT_KEY')
@@ -37,6 +36,7 @@ try:
         'databaseURL': 'https://api-idefi-ai-default-rtdb.firebaseio.com/',
         'storageBucket': 'api-idefi-ai.appspot.com'
     })
+    bucket = storage.bucket(app=firebase_app)  # Initialize Firebase Storage bucket
 except json.JSONDecodeError as e:
     raise ValueError(f"JSON Decode Error: {e}")
 except Exception as e:
@@ -63,53 +63,46 @@ agent_tracking = {
     "total_agents": 0
 }
 
-# Define base URL for api.idefi.ai
-API_BASE_URL = "https://api.idefi.ai/api"
+# Base URLs for external API calls
+Q_IDEFI_API_URL = "https://q.idefi.ai/api"
+IDEFI_API_URL = "https://api.idefi.ai/api"
+INTERNAL_API_BASE = "/api"  # for internal route calls
 
 UPLOAD_FOLDER = '/tmp'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max file size
 
+### Helper Functions ###
 
-# Helper function to call Etherscan API
-def call_etherscan(endpoint, params):
+# Function to send requests to q.idefi.ai/api/ paths
+def send_q_idefi_request(endpoint, params):
+    url = f"{Q_IDEFI_API_URL}/{endpoint}"
+    headers = {
+        "Content-Type": "application/json"
+    }
+
     try:
-        base_url = "https://api.etherscan.io/api"
-        params["apikey"] = ETHERSCAN_API_KEY
-        response = requests.get(base_url, params=params)
+        response = requests.post(url, json=params, headers=headers)
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
         return {"error": str(e)}
 
-
-# Helper function to check if the Ethereum address is valid and an EOA
-def is_valid_eoa(address):
-    if not address or len(address) != 42 or not address.startswith("0x"):
-        return {"error": "Invalid Ethereum address format"}
-
-    params = {
-        "module": "account",
-        "action": "txlist",
-        "address": address,
-        "startblock": 0,
-        "endblock": 99999999,
-        "page": 1,
-        "offset": 1,
-        "sort": "asc"
+# Function to send requests to api.idefi.ai/api/ paths
+def send_idefi_request(endpoint, params):
+    url = f"{IDEFI_API_URL}/{endpoint}"
+    headers = {
+        "Content-Type": "application/json"
     }
 
-    result = call_etherscan("getcode", params)
-    if 'error' in result:
-        return result
+    try:
+        response = requests.post(url, json=params, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        return {"error": str(e)}
 
-    if result.get("result", "") != "0x":
-        return {"error": "Address is a smart contract, not an EOA"}
-
-    return {"success": True}
-
-
-# Helper function to send email notification via Firestore-triggered Firebase function
+# Send email notification via Firestore-triggered Firebase function
 def send_email_notification(to_email, subject, body_html):
     mail_ref = db.collection('mail').document()
     mail_ref.set({
@@ -120,77 +113,357 @@ def send_email_notification(to_email, subject, body_html):
         }
     })
 
+### Endpoints ###
 
-# Endpoint to create a new agent and mint its corresponding NFT image
-@app.route('/api/agents_create', methods=['POST'])
-def create_agent():
-    data = request.get_json()
-    agent_name = data.get('agent_name')
-    agent_type = data.get('agent_type')
-    agent_role = data.get('agent_role')
-    wallet_address = data.get('wallet_address')
-    user_email = data.get('user_email')  # Get the user's email address for notifications
+# Endpoint to upload and process files via Firebase Storage
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
 
-    # Validate input
-    if not agent_name:
-        return jsonify({"error": "Agent name is required"}), 400
-    if not agent_type:
-        return jsonify({"error": "Agent type is required"}), 400
-    if not agent_role:
-        return jsonify({"error": "Agent role is required"}), 400
+    if file and file.filename.endswith(('.csv', '.json')):
+        try:
+            # Process the file
+            results = []
+            data = {}
 
-    # Validate and check Ethereum address
-    eoa_check = is_valid_eoa(wallet_address)
-    if 'error' in eoa_check:
-        return jsonify({"error": eoa_check['error']}), 400
+            if file.filename.endswith('.csv'):
+                df = pd.read_csv(file)
+                for index, row in df.iterrows():
+                    data[row['address']] = None  # Extract addresses
 
-    # Create the agent using the function from create_agent.py
-    result = create_new_agent(agent_type, agent_role)
+            elif file.filename.endswith('.json'):
+                data = json.load(file)
 
-    if 'error' in result:
-        return jsonify(result), 400
+            addresses = list(data.keys())
+            addresses = clean_and_validate_addresses(addresses)  # Implement validation logic here
 
-    # Generate the NFT image for the agent role
-    nft_image = generate_nft_image(agent_role)
-    if 'error' in nft_image:
-        return jsonify({"error": nft_image['error']}), 400
+            # Send the data to the external api.idefi.ai for processing
+            response = send_idefi_request('upload', data)
 
-    result["nft_image"] = nft_image["image_url"]
+            if 'error' in response:
+                return jsonify({'error': response['error']}), 500
 
-    # Update agent tracking statistics
-    agent_tracking[agent_role] += 1
-    agent_tracking["total_agents"] += 1
+            results = response.get('details', [])
 
-    # Send an email notification about the newly created agent
-    if user_email:
-        send_email_notification(
-            to_email=user_email,
-            subject=f"Your {agent_role} Agent '{agent_name}' has been created!",
-            body_html=f"<p>Your {agent_role} agent has been successfully created. It is now ready for task assignment and operations.</p><p>Wallet Address: {wallet_address}</p>"
-        )
+            # Save results to CSV and upload to Firebase Storage
+            csv_content = 'address,status,description\n'
+            for result in results:
+                csv_content += '{},{},{}\n'.format(result['address'], result['status'], result['description'])
 
-    # Initialize and start the new agent using uAgents
-    if agent_name:
-        if agent_type == 'Free':
-            agent = FreeAgent(agent_name)
-        elif agent_type == 'Standard':
-            agent = StandardAgent(agent_name)
-        elif agent_type == 'Smart':
-            agent = SmartAgent(agent_name)
-        elif agent_type == 'Quantum':
-            agent = QuantumAgent(agent_name)
-        else:
-            return jsonify({"error": "Invalid agent type"}), 400
+            output = BytesIO()
+            output.write(csv_content.encode())
+            output.seek(0)
+            current_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            filename = f"results_{current_date}.csv"
+            blob = bucket.blob(filename)
+            blob.upload_from_file(output, content_type='text/csv')
 
-        agent_instances[agent_type][agent_name] = agent
-        threading.Thread(target=agent.run).start()
+            file_url = blob.public_url
+            return jsonify({'details': results, 'file_url': file_url})
 
-        return jsonify(result), 201
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
     else:
-        return jsonify(result), 400
+        return jsonify({'error': 'Unsupported file type'}), 400
+
+# Endpoint to download results from api.idefi.ai
+@app.route('/api/download/<filename>', methods=['GET'])
+def download_results(filename):
+    try:
+        # Delegate the file download request to the external api.idefi.ai
+        response = send_idefi_request(f'download/{filename}', {})
+        
+        if 'error' in response:
+            return jsonify({'error': response['error']}), 404
+
+        # Assuming the file content comes from the API response
+        file_content = response.get('file_content', '')
+
+        # Send the file content as attachment
+        response = make_response(file_content)
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        response.mimetype = 'text/csv'
+        return response
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Endpoint to list JSON files from external API
+@app.route('/api/list_json_files', methods=['GET'])
+def list_json_files():
+    try:
+        response = send_idefi_request('list_json_files', method="GET")
+        if 'error' in response:
+            return jsonify({'error': response['error']}), 500
+        return jsonify({'files': response.get('files', [])}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
-# Assign tasks to a specific agent
+@app.route('/api/visualize_dataset', methods=['POST'])
+def visualize_dataset():
+    data = request.json
+    source_type = data.get('source_type')
+    address = data.get('address', None)
+    filename = data.get('filename', None)
+    max_nodes = data.get('max_nodes', None)
+
+    if not address and not filename:
+        return jsonify({'error': 'Either an Ethereum address or a filename is required'}), 400
+
+    try:
+        if address:  # Visualize relationships for an Ethereum address
+            response = send_idefi_request('visualize_address', {
+                'address': address,
+                'max_nodes': max_nodes
+            })
+            if 'error' in response:
+                return jsonify({'error': response['error']}), 500
+            visualization_url = response.get('visualization_url', '')
+            return jsonify({'visualization_url': visualization_url})
+
+        elif source_type == 'local':
+            # Visualize from a local dataset file
+            response = send_idefi_request('visualize_local', {
+                'filename': filename,
+                'max_nodes': max_nodes
+            })
+            if 'error' in response:
+                return jsonify({'error': response['error']}), 500
+            visualization_path = response.get('visualization_path', '')
+            return send_file(visualization_path, as_attachment=True)
+
+        else:
+            return jsonify({'error': 'Invalid source type. Supported types are "address" and "local".'}), 400
+
+    except Exception as e:
+        return jsonify({'error': f"An error occurred: {str(e)}"}), 500
+
+### New Metric Endpoints with api.idefi.ai Integration ###
+
+# Fetch basic metrics from api.idefi.ai
+@app.route('/api/basic_metrics', methods=['GET'])
+def basic_metrics_endpoint():
+    address = request.args.get('address')
+    if not address:
+        return jsonify({"error": "Ethereum address is required"}), 400
+
+    try:
+        # Make the request to api.idefi.ai for basic metrics
+        params = {"address": address}
+        response = send_idefi_request('basic_metrics', params)
+
+        if 'error' in response:
+            return jsonify({"error": response['error']}), 500
+
+        return jsonify(response)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Fetch intermediate metrics from api.idefi.ai
+@app.route('/api/intermediate_metrics', methods=['GET'])
+def intermediate_metrics_endpoint():
+    address = request.args.get('address')
+    if not address:
+        return jsonify({"error": "Ethereum address is required"}), 400
+
+    try:
+        # Make the request to api.idefi.ai for intermediate metrics
+        params = {"address": address}
+        response = send_idefi_request('intermediate_metrics', params)
+
+        if 'error' in response:
+            return jsonify({"error": response['error']}), 500
+
+        return jsonify(response)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Fetch advanced metrics from api.idefi.ai
+@app.route('/api/advanced_metrics', methods=['GET'])
+def advanced_metrics_endpoint():
+    address = request.args.get('address')
+    if not address:
+        return jsonify({"error": "Ethereum address is required"}), 400
+
+    try:
+        # Make the request to api.idefi.ai for advanced metrics
+        params = {"address": address}
+        response = send_idefi_request('advanced_metrics', params)
+
+        if 'error' in response:
+            return jsonify({"error": response['error']}), 500
+
+        return jsonify(response)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Endpoint to generate an explanation from q.idefi.ai
+@app.route('/api/generate-explanation', methods=['POST'])
+def generate_explanation_endpoint():
+    try:
+        data = request.get_json()
+        risk_scores = data.get('risk_scores')
+        histogram_base64 = data.get('histogram_base64')
+        circuit_base64 = data.get('circuit_base64')
+
+        if not all([risk_scores, histogram_base64, circuit_base64]):
+            return jsonify({'error': 'Missing required parameters'}), 400
+
+        # Call q.idefi.ai for explanation generation
+        params = {
+            "risk_scores": risk_scores,
+            "histogram_base64": histogram_base64,
+            "circuit_base64": circuit_base64
+        }
+        response = send_q_idefi_request('generate-explanation', params)
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Endpoint to compile and run QASM files
+@app.route("/api/compile-and-run", methods=["POST"])
+def compile_and_run():
+    data = request.json
+    filename = data.get("filename")
+    use_ibm_backend = data.get("use_ibm_backend", False)
+
+    try:
+        # Prepare and send request to q.idefi.ai
+        params = {
+            "filename": filename,
+            "use_ibm_backend": use_ibm_backend
+        }
+        response = send_q_idefi_request('compile-and-run', params)
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Endpoint to initialize quantum memory
+@app.route("/api/initialize_memory", methods=["POST"])
+def api_initialize_memory():
+    try:
+        response = send_q_idefi_request('initialize_memory', {})
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Endpoint to store state in quantum memory
+@app.route("/api/store_in_memory", methods=["POST"])
+def api_store_in_memory():
+    data = request.json
+    state = data.get("state")
+
+    if state not in ['0', '1', '+', '-']:
+        return jsonify({"error": "Invalid state. Must be one of '0', '1', '+', '-'"}), 400
+
+    try:
+        params = {"state": state}
+        response = send_q_idefi_request('store_in_memory', params)
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Endpoint to retrieve state from quantum memory
+@app.route("/api/retrieve_from_memory", methods=["POST"])
+def api_retrieve_from_memory():
+    try:
+        response = send_q_idefi_request('retrieve_from_memory', {})
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Endpoint for quantum risk analysis
+@app.route("/api/quantum_risk_analysis", methods=["POST"])
+def quantum_risk_analysis():
+    data = request.json
+    portfolio = data.get("portfolio")
+
+    if not portfolio:
+        return jsonify({"error": "Portfolio data is required"}), 400
+
+    try:
+        params = {"portfolio": portfolio}
+        response = send_q_idefi_request('quantum_risk_analysis', params)
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Endpoint for portfolio optimization
+@app.route("/api/portfolio_optimization", methods=["POST"])
+def portfolio_optimization_endpoint():
+    try:
+        data = request.get_json()
+        portfolio = data.get("portfolio")
+        if not portfolio:
+            return jsonify({"error": "Portfolio data is required"}), 400
+
+        params = {"portfolio": portfolio}
+        response = send_q_idefi_request('portfolio_optimization', params)
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Train and predict models
+@app.route("/train-qnn", methods=["POST"])
+def train_quantum_model():
+    data = request.json
+    features = data['features']
+    labels = data['labels']
+
+    try:
+        params = {"features": features, "labels": labels}
+        response = send_q_idefi_request('train-qnn', params)
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/predict-qnn", methods=["POST"])
+def predict_quantum_model():
+    data = request.json
+    features = data['features']
+
+    try:
+        params = {"features": features}
+        response = send_q_idefi_request('predict-qnn', params)
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Train and predict QSVC models
+@app.route("/train-qsvc", methods=["POST"])
+def train_qsvc_model():
+    data = request.json
+    features = data['features']
+    labels = data['labels']
+
+    try:
+        params = {"features": features, "labels": labels}
+        response = send_q_idefi_request('train-qsvc', params)
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/predict-qsvc", methods=["POST"])
+def predict_qsvc_model():
+    data = request.json
+    features = data['features']
+
+    try:
+        params = {"features": features}
+        response = send_q_idefi_request('predict-qsvc', params)
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Assign tasks to an agent
 @app.route('/api/agents_assign', methods=['POST'])
 def assign_tasks():
     data = request.get_json()
@@ -207,7 +480,6 @@ def assign_tasks():
     result = context.send(agent_name, task_data)
     return jsonify({"message": f"Tasks assigned to {agent_name}", "result": result}), 200
 
-
 # Get status of a specific agent or all agents
 @app.route('/api/agents_status', methods=['GET'])
 def get_all_agent_status():
@@ -222,13 +494,10 @@ def get_all_agent_status():
         status = agent.get_status()
         return jsonify({"status": status})
 
-    # Otherwise, return statuses for all agents
-    all_statuses = {}
-    for a_type, agents in agent_instances.items():
-        all_statuses[a_type] = {name: agent.get_status() for name, agent in agents.items()}
+    all_statuses = {a_type: {name: agent.get_status() for name, agent in agents.items()}
+                    for a_type, agents in agent_instances.items()}
 
     return jsonify(all_statuses)
-
 
 # Endpoint to sync wallet or file data for agent processing
 @app.route('/api/agents_sync', methods=['POST'])
@@ -256,12 +525,11 @@ def sync_data():
                 wallet_addresses = [row[0] for row in reader if row]
 
     context = Context(agent)
-    context.send(agent_name, {"task": task, "data": wallet_addresses})
+    result = context.send(agent_name, {"task": task, "data": wallet_addresses})
 
-    return jsonify({"message": f"Data synced to agent {agent_name}", "addresses": wallet_addresses}), 200
+    return jsonify({"message": f"Data synced to agent {agent_name}", "addresses": wallet_addresses, "result": result}), 200
 
-
-# Endpoint for agents to perform the security check
+# Perform security check by an agent
 @app.route('/api/agents_security_check', methods=['POST'])
 def security_check_task():
     data = request.get_json()
@@ -281,42 +549,16 @@ def security_check_task():
     agent = agent_instances["Smart"][agent_name]
     context = Context(agent)
 
-    check_result = send_idefi_request('checkaddress', params={'address': address})
+    check_result = send_q_idefi_request('checkaddress', params={'address': address})
     if 'error' in check_result:
         return jsonify({"error": check_result['error']}), 500
 
     return jsonify({"message": f"Security check performed by {agent_name}", "result": check_result})
 
-
-# Sync endpoint to sync agents with wallet or file data
-@app.route('/api/agents_sync_wallet', methods=['POST'])
-def sync_agent_wallet():
-    data = request.get_json()
-    agent_name = data.get('agent_name')
-    address = data.get('wallet_address')
-
-    if not agent_name or not address:
-        return jsonify({"error": "Agent name and wallet address are required"}), 400
-
-    eoa_check = is_valid_eoa(address)
-    if 'error' in eoa_check:
-        return jsonify({"error": eoa_check['error']}), 400
-
-    agent = agent_instances.get(agent_name)
-    if not agent:
-        return jsonify({"error": "Agent not found"}), 404
-
-    context = Context(agent)
-    context.send(agent_name, {"task": "sync_wallet", "wallet_address": address})
-
-    return jsonify({"message": f"Wallet {address} synced with agent {agent_name}"}), 200
-
-
 # Get agent tracking stats
 @app.route('/api/agents_tracking', methods=['GET'])
 def get_agent_tracking():
     return jsonify(agent_tracking)
-
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5328)
